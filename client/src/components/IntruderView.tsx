@@ -14,6 +14,27 @@ export function IntruderView() {
   const keyPair = useStore((state) => state.keyPair);
 
   const [attackStatus, setAttackStatus] = useState<string>('');
+  const [attackResult, setAttackResult] = useState<'success' | 'failed' | null>(null);
+
+  // Handle ATTACK_RESULT from server
+  useEffect(() => {
+    const handler = (msg: WSMessage) => {
+      const { result } = msg.payload as { result: 'success' | 'failed'; reason?: string };
+      setAttackResult(result);
+
+      if (result === 'success') {
+        setAttackStatus('✅ Attack successful! Alice accepted the forged identity.');
+      } else {
+        setAttackStatus('❌ Attack failed! Alice detected identity mismatch.');
+      }
+    };
+
+    onMessage(wsClient, 'ATTACK_RESULT', handler);
+
+    return () => {
+      // Cleanup
+    };
+  }, []);
 
   // Handle MITM_INTERCEPT - decrypt and forward MSG1
   useEffect(() => {
@@ -158,6 +179,52 @@ export function IntruderView() {
             </ol>
           </div>
         </div>
+
+        {/* Attack Result Display */}
+        {attackResult === 'success' && (
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mt-6">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">✅</span>
+              <div className="flex-1">
+                <p className="text-green-300 font-bold text-lg mb-2">MitM Attack Successful</p>
+                <div className="text-sm text-gray-300 space-y-2">
+                  <p className="font-mono">Alice ↔ Intruder ↔ Bob</p>
+                  <div className="bg-gray-900/50 rounded p-3 mt-2">
+                    <p>Alice thinks peer is: <span className="text-red-400 font-semibold">Intruder</span></p>
+                    <p>Bob thinks peer is: <span className="text-blue-400 font-semibold">Alice</span></p>
+                  </div>
+                  <p className="text-orange-300 mt-3">
+                    ⚠️ No identity verification in MSG2 — attack undetected by both parties
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {attackResult === 'failed' && (
+          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mt-6">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">❌</span>
+              <div className="flex-1">
+                <p className="text-red-300 font-bold text-lg mb-2">MitM Attack Failed</p>
+                <div className="text-sm text-gray-300 space-y-2">
+                  <p className="font-mono">Alice detected identity mismatch</p>
+                  <div className="bg-gray-900/50 rounded p-3 mt-2">
+                    <p>Expected peer: <span className="text-red-400 font-semibold">Intruder</span></p>
+                    <p>Received identity in MSG2: <span className="text-blue-400 font-semibold">Bob</span></p>
+                  </div>
+                  <p className="text-green-300 mt-3">
+                    ✅ NSL modification successfully prevented the attack
+                  </p>
+                  <p className="text-gray-400 text-xs mt-2">
+                    MSG2 contains sender identity (IDB) which Alice verifies against expected peer
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Packet Interception Table */}
         <div className="bg-gray-800 rounded-lg border border-gray-700 flex-1 flex flex-col">
