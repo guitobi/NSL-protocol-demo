@@ -86,6 +86,39 @@ export function routeMessage(
       },
       timestamp: Date.now(),
     });
+
+    // Send ATTACK_RESULT when Alice detects attack (ERROR with ATTACK DETECTED)
+    if (
+      isMitmActive(mitmManager) &&
+      msg.type === 'ERROR' &&
+      msg.from === 'Alice' &&
+      JSON.stringify(msg.payload).includes('ATTACK DETECTED')
+    ) {
+      io.to(intruderClient.socketId).emit('message', {
+        type: 'ATTACK_RESULT',
+        from: 'server',
+        to: 'Intruder',
+        payload: { result: 'failed', reason: 'Alice detected identity mismatch' },
+        timestamp: Date.now(),
+      });
+      console.log('[MitM] Attack failed - Alice detected identity mismatch');
+    }
+
+    // Send ATTACK_RESULT when Alice successfully completes handshake
+    if (
+      isMitmActive(mitmManager) &&
+      msg.type === 'HANDSHAKE_OK' &&
+      msg.from === 'Alice'
+    ) {
+      io.to(intruderClient.socketId).emit('message', {
+        type: 'ATTACK_RESULT',
+        from: 'server',
+        to: 'Intruder',
+        payload: { result: 'success' },
+        timestamp: Date.now(),
+      });
+      console.log('[MitM] Attack successful - Alice completed handshake without detecting attack');
+    }
   }
 
   // MitM interception logic: intercept NSL_MSG1 from Alice/Bob to Bob/Alice
