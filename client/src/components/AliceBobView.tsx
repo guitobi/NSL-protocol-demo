@@ -517,6 +517,15 @@ export function AliceBobView() {
           color: 'blue',
         });
       } catch (error) {
+        // Show error in chat
+        addChatMessage({
+          from: 'system' as ClientId,
+          to: myId!,
+          text: `⚠️ Не вдалося розшифрувати повідомлення від ${msg.from}`,
+          timestamp: Date.now(),
+          isSystem: true,
+        });
+
         addProtocolLog({
           type: 'ERROR',
           from: myId || 'unknown',
@@ -571,6 +580,15 @@ export function AliceBobView() {
             color: 'blue',
           });
         } catch (error) {
+          // Show error in chat
+          addChatMessage({
+            from: 'system' as ClientId,
+            to: myId,
+            text: `⚠️ Повідомлення не відправлено`,
+            timestamp: Date.now(),
+            isSystem: true,
+          });
+
           addProtocolLog({
             type: 'ERROR',
             from: myId,
@@ -583,7 +601,7 @@ export function AliceBobView() {
       };
       sendEncrypted();
     }
-  }, [chatMessages, myId, sessionKey, activePeerId, addProtocolLog]);
+  }, [chatMessages, myId, sessionKey, activePeerId, addProtocolLog, addChatMessage]);
 
   // Filter peers: show only the other person (Alice sees Bob, Bob sees Alice)
   const availablePeers = peers.filter((peer) => {
