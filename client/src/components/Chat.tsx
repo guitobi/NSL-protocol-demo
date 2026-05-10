@@ -43,6 +43,12 @@ export function Chat() {
       (msg.from === activePeerId && msg.to === myId)
   );
 
+  // Generate a simple IV preview (first 8 chars of timestamp hash)
+  const getIvPreview = (timestamp: number) => {
+    const hash = timestamp.toString(16).padStart(8, '0').substring(0, 8);
+    return hash;
+  };
+
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Messages area */}
@@ -56,27 +62,41 @@ export function Chat() {
           </div>
         ) : (
           conversationMessages.map((msg, idx) => (
-            <div
-              key={`${msg.timestamp}-${idx}`}
-              className={`flex ${msg.from === myId ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                  msg.from === myId
-                    ? 'bg-blue-500 text-white rounded-br-sm'
-                    : 'bg-gray-200 text-gray-900 rounded-bl-sm'
-                }`}
-              >
-                <div className="text-sm break-words">{msg.text}</div>
-                <div
-                  className={`text-xs mt-1 ${
-                    msg.from === myId ? 'text-blue-100' : 'text-gray-500'
-                  }`}
-                >
-                  {new Date(msg.timestamp).toLocaleTimeString()}
+            msg.isSystem ? (
+              // System message - gray badge centered
+              <div key={`${msg.timestamp}-${idx}`} className="flex justify-center my-2">
+                <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1 rounded-full">
+                  {msg.text}
                 </div>
               </div>
-            </div>
+            ) : (
+              // Regular message - bubble
+              <div
+                key={`${msg.timestamp}-${idx}`}
+                className={`flex ${msg.from === myId ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                    msg.from === myId
+                      ? 'bg-blue-500 text-white rounded-br-sm'
+                      : 'bg-gray-200 text-gray-900 rounded-bl-sm'
+                  }`}
+                >
+                  <div className="text-sm break-words">{msg.text}</div>
+                  <div
+                    className={`text-xs mt-1 flex items-center gap-2 ${
+                      msg.from === myId ? 'text-blue-100' : 'text-gray-500'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1">
+                      <span>🔒</span>
+                      <span className="font-mono">{getIvPreview(msg.timestamp)}</span>
+                    </span>
+                    <span>{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                </div>
+              </div>
+            )
           ))
         )}
         <div ref={messagesEndRef} />
