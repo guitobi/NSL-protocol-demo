@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { wsClient, send } from '../websocket';
+import { wsClient, send, onMessage } from '../websocket';
 import { formatTime } from '../utils';
 import { exportPublicKey } from '../crypto';
+import { decryptRSA, encryptRSA } from '../crypto';
+import type { WSMessage } from '../types';
 
 export function IntruderView() {
   const mitmActive = useStore((state) => state.mitmActive);
@@ -12,6 +14,66 @@ export function IntruderView() {
   const keyPair = useStore((state) => state.keyPair);
 
   const [attackStatus, setAttackStatus] = useState<string>('');
+
+  // Handle MITM_INTERCEPT - decrypt and forward MSG1
+  useEffect(() => {
+    const handler = async (msg: WSMessage) => {
+      if (!keyPair) return;
+
+      const { originalFrom, originalTo, originalPayload } = msg.payload as {
+        originalFrom: string;
+        originalTo: string;
+        originalPayload: { ciphertext: string };
+      };
+
+      console.log('[Intruder] Intercepted MSG1 from', originalFrom, 'to', originalTo);
+
+      try {
+        // Decrypt MSG1 with Intruder's private key
+        const decrypted = await decryptRSA(originalPayload.ciphertext, keyPair.privateKey);
+
+        // Extract NA and IDA (first 16 bytes = nonce, rest = sender ID)
+        const NA = decrypted.slice(0, 16);
+        const IDA = decrypted.slice(16);
+
+        console.log('[Intruder] Decrypted MSG1 - NA length:', NA.length, 'IDA:', new TextDecoder().decode(IDA));
+
+        // Get Bob's REAL public key from peers
+        const bobPeer = peers.find(p => p.id === 'Bob');
+        if (!bobPeer) {
+          console.error('[Intruder] Bob not found in peers list');
+          return;
+        }
+
+        // Re-encrypt with Bob's real public key, preserving original NA and IDA
+        const forgedPayload = new Uint8Array(NA.length + IDA.length);
+        forgedPayload.set(NA, 0);
+        forgedPayload.set(IDA, NA.length);
+
+        const forgedCiphertext = await encryptRSA(forgedPayload, bobPeer.publicKey);
+
+        // Send forged MSG1 to Bob (spoofing Alice's identity)
+        send(wsClient, {
+          type: 'NSL_MSG1',
+          from: originalFrom,  // Spoof as Alice
+          to: originalTo,      // To Bob
+          payload: { ciphertext: forgedCiphertext },
+          timestamp: Date.now(),
+        });
+
+        console.log('[Intruder] Forwarded forged MSG1 to Bob');
+        setAttackStatus('MSG1 intercepted and forwarded to Bob. Waiting for Bob\'s response...');
+      } catch (error) {
+        console.error('[Intruder] Failed to process intercepted MSG1:', error);
+      }
+    };
+
+    onMessage(wsClient, 'MITM_INTERCEPT', handler);
+
+    return () => {
+      // Cleanup
+    };
+  }, [keyPair, peers]);
 
   const handleActivateMitm = async () => {
     if (!keyPair) {

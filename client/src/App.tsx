@@ -54,13 +54,7 @@ function App() {
 
       console.log('[Intruder] Intercepted MSG1:', { originalFrom, originalTo });
 
-      // For now, just log it. In a full implementation, Intruder would:
-      // 1. Decrypt MSG1 with their private key
-      // 2. Extract nonce and sender ID
-      // 3. Re-encrypt for the other party with forged sender
-      // 4. Send forged MSG1
-
-      // This demonstrates the server-side interception working
+      // Add to intercepted packets
       addInterceptedPacket({
         timestamp: Date.now(),
         from: originalFrom,
