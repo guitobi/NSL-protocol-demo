@@ -48,11 +48,16 @@ export function setupSocketHandlers(
           publicKey,
         });
         console.log(`Client registered: ${id}`);
-        broadcastPeerList(io, clientManager);
+        broadcastPeerList(io, clientManager, mitmManager);
       } else if (type === 'ACTIVATE_MITM') {
         // Intruder activates MitM attack
         if (from === 'Intruder') {
-          activateMitm(mitmManager);
+          const { publicKey } = payload as { publicKey: string };
+          activateMitm(mitmManager, publicKey);
+
+          // Broadcast modified PEER_LIST to Alice
+          broadcastPeerList(io, clientManager, mitmManager);
+
           socket.emit('message', {
             type: 'MITM_ACTIVATED',
             from: 'server',
@@ -66,6 +71,10 @@ export function setupSocketHandlers(
         // Intruder deactivates MitM attack
         if (from === 'Intruder') {
           deactivateMitm(mitmManager);
+
+          // Broadcast normal PEER_LIST to all
+          broadcastPeerList(io, clientManager, mitmManager);
+
           socket.emit('message', {
             type: 'MITM_DEACTIVATED',
             from: 'server',
@@ -90,7 +99,7 @@ export function setupSocketHandlers(
       } else if (type === 'DISCONNECT') {
         unregisterClient(clientManager, from);
         console.log(`Client disconnected: ${from}`);
-        broadcastPeerList(io, clientManager);
+        broadcastPeerList(io, clientManager, mitmManager);
       } else {
         routeMessage(io, msg, clientManager, mitmManager);
       }
@@ -115,7 +124,7 @@ export function setupSocketHandlers(
         console.log('[Server] All clients disconnected - reset protocol and MitM state');
       }
 
-      broadcastPeerList(io, clientManager);
+      broadcastPeerList(io, clientManager, mitmManager);
     }
   });
 }
