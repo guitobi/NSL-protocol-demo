@@ -651,9 +651,23 @@ export function AliceBobView() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b px-6 py-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">NSL Protocol Demo - {myId}</h1>
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{status.icon}</span>
-          <span className={`font-semibold ${status.color}`}>{status.text}</span>
+        <div className="flex items-center gap-4">
+          {/* Connection status */}
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{status.icon}</span>
+            <span className={`font-semibold ${status.color}`}>{status.text}</span>
+          </div>
+
+          {/* Protocol badge */}
+          {protocol && (
+            <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+              protocol === 'NSL'
+                ? 'bg-green-100 text-green-800 border border-green-300'
+                : 'bg-orange-100 text-orange-800 border border-orange-300'
+            }`}>
+              {protocol} {protocol === 'NSL' ? '✅' : '⚠️'}
+            </div>
+          )}
         </div>
       </div>
 
