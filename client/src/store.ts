@@ -9,9 +9,7 @@ import type {
   InterceptedPacket,
   Protocol,
 } from './types';
-
-const MAX_CHAT_MESSAGES = 1000;
-const MAX_PROTOCOL_LOGS = 500;
+import { MAX_CHAT_MESSAGES, MAX_PROTOCOL_LOGS } from './utils';
 
 interface AppState {
   // Identity and state
