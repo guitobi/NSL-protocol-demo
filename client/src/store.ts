@@ -6,6 +6,8 @@ import type {
   Peer,
   ChatMessage,
   ProtocolLog,
+  InterceptedPacket,
+  Protocol,
 } from './types';
 
 const MAX_CHAT_MESSAGES = 1000;
@@ -15,6 +17,7 @@ interface AppState {
   // Identity and state
   myId: ClientId | null;
   fsmState: FSMState;
+  protocol: Protocol | null;
 
   // Cryptographic keys
   keyPair: KeyPair | null;
@@ -25,52 +28,55 @@ interface AppState {
   peerNonce: Uint8Array | null;
   sessionKey: CryptoKey | null;
   activePeerId: ClientId | null;
+  isInitiator: boolean;
 
   // Messages and logs
   chatMessages: ChatMessage[];
   protocolLogs: ProtocolLog[];
 
-  // Intruder attack state
-  attackMode: 'NONE' | 'LOWE';
-  attackTarget: ClientId | null;
-  interceptedNonce: Uint8Array | null;
-  interceptedSender: ClientId | null;
+  // Intruder state
+  mitmActive: boolean;
+  interceptedPackets: InterceptedPacket[];
+  attackDetected: boolean;
 
   // Actions
   setMyId: (id: ClientId) => void;
   setFsmState: (state: FSMState) => void;
+  setProtocol: (protocol: Protocol | null) => void;
   setKeyPair: (keyPair: KeyPair) => void;
   setPeers: (peers: Peer[]) => void;
   setMyNonce: (nonce: Uint8Array | null) => void;
   setPeerNonce: (nonce: Uint8Array | null) => void;
   setSessionKey: (key: CryptoKey | null) => void;
   setActivePeerId: (id: ClientId | null) => void;
+  setIsInitiator: (isInitiator: boolean) => void;
   addChatMessage: (message: ChatMessage) => void;
   addProtocolLog: (log: ProtocolLog) => void;
   clearChatMessages: () => void;
   clearProtocolLogs: () => void;
-  setAttackMode: (mode: 'NONE' | 'LOWE') => void;
-  setAttackTarget: (target: ClientId | null) => void;
-  setInterceptedNonce: (nonce: Uint8Array | null) => void;
-  setInterceptedSender: (sender: ClientId | null) => void;
+  setMitmActive: (active: boolean) => void;
+  addInterceptedPacket: (packet: InterceptedPacket) => void;
+  setInterceptedPackets: (packets: InterceptedPacket[]) => void;
+  setAttackDetected: (detected: boolean) => void;
   reset: () => void;
 }
 
 const initialState = {
   myId: null,
   fsmState: 'IDLE' as FSMState,
+  protocol: null,
   keyPair: null,
   peers: [],
   myNonce: null,
   peerNonce: null,
   sessionKey: null,
   activePeerId: null,
+  isInitiator: false,
   chatMessages: [],
   protocolLogs: [],
-  attackMode: 'NONE' as const,
-  attackTarget: null,
-  interceptedNonce: null,
-  interceptedSender: null,
+  mitmActive: false,
+  interceptedPackets: [],
+  attackDetected: false,
 };
 
 export const useStore = create<AppState>((set) => ({
@@ -78,12 +84,14 @@ export const useStore = create<AppState>((set) => ({
 
   setMyId: (myId) => set({ myId }),
   setFsmState: (fsmState) => set({ fsmState }),
+  setProtocol: (protocol) => set({ protocol }),
   setKeyPair: (keyPair) => set({ keyPair }),
   setPeers: (peers) => set({ peers }),
   setMyNonce: (myNonce) => set({ myNonce }),
   setPeerNonce: (peerNonce) => set({ peerNonce }),
   setSessionKey: (sessionKey) => set({ sessionKey }),
   setActivePeerId: (activePeerId) => set({ activePeerId }),
+  setIsInitiator: (isInitiator) => set({ isInitiator }),
 
   addChatMessage: (message) =>
     set((state) => {
@@ -104,10 +112,19 @@ export const useStore = create<AppState>((set) => ({
   clearChatMessages: () => set({ chatMessages: [] }),
   clearProtocolLogs: () => set({ protocolLogs: [] }),
 
-  setAttackMode: (attackMode) => set({ attackMode }),
-  setAttackTarget: (attackTarget) => set({ attackTarget }),
-  setInterceptedNonce: (interceptedNonce) => set({ interceptedNonce }),
-  setInterceptedSender: (interceptedSender) => set({ interceptedSender }),
+  setMitmActive: (mitmActive) => set({ mitmActive }),
+
+  addInterceptedPacket: (packet) =>
+    set((state) => {
+      const packets = [...state.interceptedPackets, packet];
+      return {
+        interceptedPackets: packets.slice(-100), // Keep last 100
+      };
+    }),
+
+  setInterceptedPackets: (interceptedPackets) => set({ interceptedPackets }),
+
+  setAttackDetected: (attackDetected) => set({ attackDetected }),
 
   reset: () => set(initialState),
 }));

@@ -1,5 +1,7 @@
 export type ClientId = 'Alice' | 'Bob' | 'Intruder';
 
+export type Protocol = 'NSPK' | 'NSL';
+
 export type FSMState = 'IDLE' | 'HANDSHAKE' | 'SESSION' | 'ERROR';
 
 export type MessageType =
@@ -12,9 +14,21 @@ export type MessageType =
   | 'CHAT_MSG'
   | 'ATTACK_SIM'
   | 'ERROR'
-  | 'DISCONNECT';
+  | 'DISCONNECT'
+  | 'ACTIVATE_MITM'
+  | 'DEACTIVATE_MITM'
+  | 'MITM_ACTIVATED'
+  | 'MITM_DEACTIVATED'
+  | 'MITM_INTERCEPT'
+  | 'PACKET_INTERCEPTED'
+  | 'PACKET_HISTORY'
+  | 'GET_PACKETS'
+  | 'SET_PROTOCOL'
+  | 'PROTOCOL_SET'
+  | 'SESSION_END'
+  | 'ATTACK_RESULT';
 
-export type LogColor = 'green' | 'blue' | 'red' | 'gray';
+export type LogColor = 'green' | 'blue' | 'red' | 'gray' | 'orange';
 
 export interface Peer {
   id: ClientId;
@@ -27,10 +41,11 @@ export interface KeyPair {
 }
 
 export interface ChatMessage {
-  from: ClientId;
+  from: ClientId | 'system';
   to: ClientId;
   text: string;
   timestamp: number;
+  isSystem?: boolean;
 }
 
 export interface ProtocolLog {
@@ -53,6 +68,14 @@ export interface WSMessage {
 export interface EncryptedMessage {
   iv: string;  // base64
   ciphertext: string;  // base64
+}
+
+export interface InterceptedPacket {
+  timestamp: number;
+  from: string;
+  to: string;
+  messageType: string;
+  payloadPreview: string;
 }
 
 export interface CryptoErrorData {
