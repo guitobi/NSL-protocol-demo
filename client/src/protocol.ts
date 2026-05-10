@@ -94,16 +94,22 @@ export async function createMSG2(
   peerNonce: Uint8Array,
   myNonce: Uint8Array,
   myId: ClientId,
-  peerPublicKey: CryptoKey
+  peerPublicKey: CryptoKey,
+  protocol: 'NSPK' | 'NSL'
 ): Promise<string> {
   try {
-    const idBytes = new TextEncoder().encode(myId);
+    const idBytes = protocol === 'NSL'
+      ? new TextEncoder().encode(myId)
+      : new Uint8Array(0);  // NSPK: no identity
+
     const payload = new Uint8Array(
       peerNonce.length + myNonce.length + idBytes.length
     );
     payload.set(peerNonce, 0);
     payload.set(myNonce, peerNonce.length);
-    payload.set(idBytes, peerNonce.length + myNonce.length);
+    if (protocol === 'NSL') {
+      payload.set(idBytes, peerNonce.length + myNonce.length);
+    }
 
     return await encryptRSA(payload, peerPublicKey);
   } catch (error) {
@@ -116,7 +122,8 @@ export async function verifyMSG2(
   ciphertext: string,
   myNonce: Uint8Array,
   myPrivateKey: CryptoKey,
-  expectedPeerId: ClientId
+  expectedPeerId: ClientId,
+  protocol: 'NSPK' | 'NSL'
 ): Promise<{ peerNonce: Uint8Array; peerId: ClientId }> {
   try {
     const decrypted = await decryptRSA(ciphertext, myPrivateKey);
@@ -127,23 +134,34 @@ export async function verifyMSG2(
 
     const receivedMyNonce = decrypted.slice(0, NONCE_LENGTH);
     const peerNonce = decrypted.slice(NONCE_LENGTH, NONCE_LENGTH * 2);
-    const idBytes = decrypted.slice(NONCE_LENGTH * 2);
-    const peerId = new TextDecoder().decode(idBytes) as ClientId;
 
-    // Verify my nonce
+    // Verify nonce (always)
     if (!constantTimeCompare(receivedMyNonce, myNonce)) {
       throw createProtocolError('MSG2', 'Nonce mismatch');
     }
 
-    // Lowe attack detection: verify peer identity
-    if (peerId !== expectedPeerId) {
-      throw createProtocolError(
-        'MSG2',
-        `Identity mismatch: expected ${expectedPeerId}, got ${peerId}`
-      );
-    }
+    // Verify identity (NSL only)
+    if (protocol === 'NSL') {
+      if (decrypted.length <= NONCE_LENGTH * 2) {
+        throw createProtocolError('MSG2', 'Missing identity in NSL mode');
+      }
 
-    return { peerNonce, peerId };
+      const idBytes = decrypted.slice(NONCE_LENGTH * 2);
+      const peerId = new TextDecoder().decode(idBytes) as ClientId;
+
+      if (peerId !== expectedPeerId) {
+        throw createProtocolError(
+          'MSG2',
+          `ATTACK DETECTED: Identity mismatch - expected ${expectedPeerId}, got ${peerId}`
+        );
+      }
+
+      return { peerNonce, peerId };
+    } else {
+      // NSPK: identity не передається в MSG2, тому приймаємо будь-який peer
+      // Саме тут і є вразливість — ми не знаємо з ким реально говоримо
+      return { peerNonce, peerId: expectedPeerId };
+    }
   } catch (error) {
     const err = error as Error;
     if (err.name === 'CryptoError' || err.name === 'ProtocolError') {
