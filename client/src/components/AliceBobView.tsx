@@ -554,7 +554,9 @@ export function AliceBobView() {
   });
 
   const handleSelectPeer = (peerId: ClientId) => {
-    setIsInitiator(true);
+    // Deterministic initiator selection: smaller ID is always initiator
+    const amInitiator = myId! < peerId;
+    setIsInitiator(amInitiator);
     setActivePeerId(peerId);
   };
 
