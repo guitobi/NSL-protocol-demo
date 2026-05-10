@@ -452,6 +452,45 @@ export function AliceBobView() {
     };
   }, [keyPair, myNonce, peerNonce, fsmState, myId, setSessionKey, setFsmState, addProtocolLog]);
 
+  // Handle SESSION_END
+  useEffect(() => {
+    const handler = (msg: WSMessage) => {
+      if (msg.from === activePeerId) {
+        // Peer ended session - return to contacts screen
+        setActivePeerId(null);
+        setFsmState('IDLE');
+        setSessionKey(null);
+        setMyNonce(null);
+        setPeerNonce(null);
+        setAttackDetected(false);
+
+        // Show system message in chat (if still visible)
+        addChatMessage({
+          from: 'system' as ClientId,
+          to: myId!,
+          text: `${msg.from} завершив сесію`,
+          timestamp: Date.now(),
+          isSystem: true,
+        });
+
+        addProtocolLog({
+          type: 'SESSION_END',
+          from: msg.from,
+          to: myId!,
+          description: `${msg.from} завершив сесію`,
+          timestamp: Date.now(),
+          color: 'gray',
+        });
+      }
+    };
+
+    onMessage(wsClient, 'SESSION_END', handler);
+
+    return () => {
+      // Cleanup
+    };
+  }, [activePeerId, myId, setActivePeerId, setFsmState, setSessionKey, setMyNonce, setPeerNonce, setAttackDetected, addChatMessage, addProtocolLog]);
+
   // Handle encrypted chat messages
   useEffect(() => {
     const handler = async (msg: WSMessage) => {
@@ -561,6 +600,18 @@ export function AliceBobView() {
   };
 
   const handleCloseChat = () => {
+    // Notify peer about session end
+    if (activePeerId && myId) {
+      send(wsClient, {
+        type: 'SESSION_END',
+        from: myId,
+        to: activePeerId,
+        payload: {},
+        timestamp: Date.now(),
+      });
+    }
+
+    // Reset local state
     setActivePeerId(null);
     setFsmState('IDLE');
     setSessionKey(null);
