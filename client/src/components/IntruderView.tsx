@@ -2,21 +2,31 @@ import { useState } from 'react';
 import { useStore } from '../store';
 import { wsClient, send } from '../websocket';
 import { formatTime } from '../utils';
+import { exportPublicKey } from '../crypto';
 
 export function IntruderView() {
   const mitmActive = useStore((state) => state.mitmActive);
   const setMitmActive = useStore((state) => state.setMitmActive);
   const interceptedPackets = useStore((state) => state.interceptedPackets);
   const peers = useStore((state) => state.peers);
+  const keyPair = useStore((state) => state.keyPair);
 
   const [attackStatus, setAttackStatus] = useState<string>('');
 
-  const handleActivateMitm = () => {
+  const handleActivateMitm = async () => {
+    if (!keyPair) {
+      console.error('No keypair available');
+      return;
+    }
+
+    // Export public key to send to server
+    const publicKeyJWK = await exportPublicKey(keyPair.publicKey);
+
     send(wsClient, {
       type: 'ACTIVATE_MITM',
       from: 'Intruder',
       to: 'server',
-      payload: {},
+      payload: { publicKey: publicKeyJWK },
       timestamp: Date.now(),
     });
     setAttackStatus('MitM activated. Waiting for next handshake between Alice and Bob...');
