@@ -1,34 +1,35 @@
-export type ClientId = 'Alice' | 'Bob' | 'Intruder';
+export type ClientId = "Alice" | "Bob" | "Intruder";
 
-export type Protocol = 'NSPK' | 'NSL';
+export type Protocol = "NSPK" | "NSL";
 
-export type FSMState = 'IDLE' | 'HANDSHAKE' | 'SESSION' | 'ERROR';
+export type FSMState = "IDLE" | "HANDSHAKE" | "SESSION" | "ERROR";
 
 export type MessageType =
-  | 'REGISTER'
-  | 'PEER_LIST'
-  | 'NSL_MSG1'
-  | 'NSL_MSG2'
-  | 'NSL_MSG3'
-  | 'HANDSHAKE_OK'
-  | 'CHAT_MSG'
-  | 'ATTACK_SIM'
-  | 'ERROR'
-  | 'DISCONNECT'
-  | 'ACTIVATE_MITM'
-  | 'DEACTIVATE_MITM'
-  | 'MITM_ACTIVATED'
-  | 'MITM_DEACTIVATED'
-  | 'MITM_INTERCEPT'
-  | 'PACKET_INTERCEPTED'
-  | 'PACKET_HISTORY'
-  | 'GET_PACKETS'
-  | 'SET_PROTOCOL'
-  | 'PROTOCOL_SET'
-  | 'SESSION_END'
-  | 'ATTACK_RESULT';
+  | "REGISTER"
+  | "PEER_LIST"
+  | "NSL_MSG1"
+  | "NSL_MSG2"
+  | "NSL_MSG3"
+  | "HANDSHAKE_OK"
+  | "CHAT_MSG"
+  | "ATTACK_SIM"
+  | "ERROR"
+  | "DISCONNECT"
+  | "ACTIVATE_MITM"
+  | "DEACTIVATE_MITM"
+  | "MITM_ACTIVATED"
+  | "MITM_DEACTIVATED"
+  | "MITM_INTERCEPT"
+  | "PACKET_INTERCEPTED"
+  | "PACKET_HISTORY"
+  | "GET_PACKETS"
+  | "SET_PROTOCOL"
+  | "PROTOCOL_SET"
+  | "SESSION_END"
+  | "ATTACK_RESULT"
+  | "BOOTSTRAP_SNAPSHOT";
 
-export type LogColor = 'green' | 'blue' | 'red' | 'gray' | 'orange';
+export type LogColor = "green" | "blue" | "red" | "gray" | "orange";
 
 export interface Peer {
   id: ClientId;
@@ -41,7 +42,7 @@ export interface KeyPair {
 }
 
 export interface ChatMessage {
-  from: ClientId | 'system';
+  from: ClientId | "system";
   to: ClientId;
   text: string;
   timestamp: number;
@@ -66,8 +67,8 @@ export interface WSMessage {
 }
 
 export interface EncryptedMessage {
-  iv: string;  // base64
-  ciphertext: string;  // base64
+  iv: string; // base64
+  ciphertext: string; // base64
 }
 
 export interface InterceptedPacket {
@@ -76,33 +77,46 @@ export interface InterceptedPacket {
   to: string;
   messageType: string;
   payloadPreview: string;
+  mode?: "passive" | "active";
+  protocol?: Protocol;
+  attackStep?: string;
+  blockedByProtocol?: boolean;
+  abortReason?: string;
 }
 
 export interface CryptoErrorData {
-  name: 'CryptoError';
+  name: "CryptoError";
   message: string;
   operation: string;
   originalError: Error;
 }
 
-export function createCryptoError(operation: string, originalError: Error): Error & CryptoErrorData {
-  const error = new Error(`Crypto operation failed: ${operation}`) as Error & CryptoErrorData;
-  error.name = 'CryptoError';
+export function createCryptoError(
+  operation: string,
+  originalError: Error,
+): Error & CryptoErrorData {
+  const error = new Error(`Crypto operation failed: ${operation}`) as Error &
+    CryptoErrorData;
+  error.name = "CryptoError";
   error.operation = operation;
   error.originalError = originalError;
   return error;
 }
 
 export interface ProtocolErrorData {
-  name: 'ProtocolError';
+  name: "ProtocolError";
   message: string;
-  step: 'MSG1' | 'MSG2' | 'MSG3';
+  step: "MSG1" | "MSG2" | "MSG3";
   reason: string;
 }
 
-export function createProtocolError(step: 'MSG1' | 'MSG2' | 'MSG3', reason: string): Error & ProtocolErrorData {
-  const error = new Error(`Protocol error at ${step}: ${reason}`) as Error & ProtocolErrorData;
-  error.name = 'ProtocolError';
+export function createProtocolError(
+  step: "MSG1" | "MSG2" | "MSG3",
+  reason: string,
+): Error & ProtocolErrorData {
+  const error = new Error(`Protocol error at ${step}: ${reason}`) as Error &
+    ProtocolErrorData;
+  error.name = "ProtocolError";
   error.step = step;
   error.reason = reason;
   return error;

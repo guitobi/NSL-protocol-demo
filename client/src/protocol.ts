@@ -1,15 +1,13 @@
-import {
-  encryptRSA,
-  decryptRSA,
-} from './crypto';
-import {
-  createProtocolError,
-} from './types';
-import type { ClientId } from './types';
+import { encryptRSA, decryptRSA } from "./crypto";
+import { createProtocolError } from "./types";
+import type { ClientId } from "./types";
 
 const NONCE_LENGTH = 16;
-const MSG2_MIN_PAYLOAD_LENGTH = NONCE_LENGTH * 2;
-const VALID_CLIENT_IDS: readonly ClientId[] = ['Alice', 'Bob', 'Intruder'] as const;
+const VALID_CLIENT_IDS: readonly ClientId[] = [
+  "Alice",
+  "Bob",
+  "Intruder",
+] as const;
 
 function constantTimeCompare(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
@@ -26,27 +24,27 @@ function generateNonce(): Uint8Array {
 
 async function deriveSessionKey(
   nonceA: Uint8Array,
-  nonceB: Uint8Array
+  nonceB: Uint8Array,
 ): Promise<CryptoKey> {
   const combined = new Uint8Array(nonceA.length + nonceB.length);
   combined.set(nonceA, 0);
   combined.set(nonceB, nonceA.length);
 
-  const hash = await window.crypto.subtle.digest('SHA-256', combined);
+  const hash = await window.crypto.subtle.digest("SHA-256", combined);
 
   return await window.crypto.subtle.importKey(
-    'raw',
+    "raw",
     hash,
-    { name: 'AES-GCM', length: 256 },
+    { name: "AES-GCM", length: 256 },
     true,
-    ['encrypt', 'decrypt']
+    ["encrypt", "decrypt"],
   );
 }
 
 export async function createMSG1(
   myId: ClientId,
   myNonce: Uint8Array,
-  peerPublicKey: CryptoKey
+  peerPublicKey: CryptoKey,
 ): Promise<string> {
   try {
     const idBytes = new TextEncoder().encode(myId);
@@ -56,20 +54,23 @@ export async function createMSG1(
 
     return await encryptRSA(payload, peerPublicKey);
   } catch (error) {
-    if ((error as Error).name === 'CryptoError') throw error;
-    throw createProtocolError('MSG1', 'Failed to create MSG1');
+    if ((error as Error).name === "CryptoError") throw error;
+    throw createProtocolError("MSG1", "Failed to create MSG1");
   }
 }
 
 export async function verifyMSG1(
   ciphertext: string,
-  myPrivateKey: CryptoKey
+  myPrivateKey: CryptoKey,
 ): Promise<{ nonce: Uint8Array; peerId: ClientId }> {
   try {
     const decrypted = await decryptRSA(ciphertext, myPrivateKey);
 
-    if (decrypted.length <= NONCE_LENGTH) {
-      throw createProtocolError('MSG1', 'Invalid MSG1 payload length');
+    if (
+      decrypted.length <= NONCE_LENGTH ||
+      decrypted.length > NONCE_LENGTH + 16
+    ) {
+      throw createProtocolError("MSG1", "Invalid MSG1 payload length");
     }
 
     const nonce = decrypted.slice(0, NONCE_LENGTH);
@@ -77,16 +78,16 @@ export async function verifyMSG1(
     const peerId = new TextDecoder().decode(idBytes) as ClientId;
 
     if (!VALID_CLIENT_IDS.includes(peerId)) {
-      throw createProtocolError('MSG1', `Invalid peer ID: ${peerId}`);
+      throw createProtocolError("MSG1", `Invalid peer ID: ${peerId}`);
     }
 
     return { nonce, peerId };
   } catch (error) {
     const err = error as Error;
-    if (err.name === 'CryptoError' || err.name === 'ProtocolError') {
+    if (err.name === "CryptoError" || err.name === "ProtocolError") {
       throw error;
     }
-    throw createProtocolError('MSG1', 'Failed to verify MSG1');
+    throw createProtocolError("MSG1", "Failed to verify MSG1");
   }
 }
 
@@ -95,26 +96,25 @@ export async function createMSG2(
   myNonce: Uint8Array,
   myId: ClientId,
   peerPublicKey: CryptoKey,
-  protocol: 'NSPK' | 'NSL'
+  protocol: "NSPK" | "NSL",
 ): Promise<string> {
   try {
-    const idBytes = protocol === 'NSL'
-      ? new TextEncoder().encode(myId)
-      : new Uint8Array(0);  // NSPK: no identity
+    const idBytes =
+      protocol === "NSL" ? new TextEncoder().encode(myId) : new Uint8Array(0); // NSPK: no identity
 
     const payload = new Uint8Array(
-      peerNonce.length + myNonce.length + idBytes.length
+      peerNonce.length + myNonce.length + idBytes.length,
     );
     payload.set(peerNonce, 0);
     payload.set(myNonce, peerNonce.length);
-    if (protocol === 'NSL') {
+    if (protocol === "NSL") {
       payload.set(idBytes, peerNonce.length + myNonce.length);
     }
 
     return await encryptRSA(payload, peerPublicKey);
   } catch (error) {
-    if ((error as Error).name === 'CryptoError') throw error;
-    throw createProtocolError('MSG2', 'Failed to create MSG2');
+    if ((error as Error).name === "CryptoError") throw error;
+    throw createProtocolError("MSG2", "Failed to create MSG2");
   }
 }
 
@@ -123,13 +123,15 @@ export async function verifyMSG2(
   myNonce: Uint8Array,
   myPrivateKey: CryptoKey,
   expectedPeerId: ClientId,
-  protocol: 'NSPK' | 'NSL'
+  protocol: "NSPK" | "NSL",
 ): Promise<{ peerNonce: Uint8Array; peerId: ClientId }> {
   try {
     const decrypted = await decryptRSA(ciphertext, myPrivateKey);
 
-    if (decrypted.length <= MSG2_MIN_PAYLOAD_LENGTH) {
-      throw createProtocolError('MSG2', 'Invalid MSG2 payload length');
+    const minLength = NONCE_LENGTH * 2;
+    const maxLength = protocol === "NSL" ? minLength + 16 : minLength;
+    if (decrypted.length < minLength || decrypted.length > maxLength) {
+      throw createProtocolError("MSG2", "Invalid MSG2 payload length");
     }
 
     const receivedMyNonce = decrypted.slice(0, NONCE_LENGTH);
@@ -137,22 +139,26 @@ export async function verifyMSG2(
 
     // Verify nonce (always)
     if (!constantTimeCompare(receivedMyNonce, myNonce)) {
-      throw createProtocolError('MSG2', 'Nonce mismatch');
+      throw createProtocolError("MSG2", "Nonce mismatch");
     }
 
     // Verify identity (NSL only)
-    if (protocol === 'NSL') {
+    if (protocol === "NSL") {
       if (decrypted.length <= NONCE_LENGTH * 2) {
-        throw createProtocolError('MSG2', 'Missing identity in NSL mode');
+        throw createProtocolError("MSG2", "Missing identity in NSL mode");
       }
 
       const idBytes = decrypted.slice(NONCE_LENGTH * 2);
       const peerId = new TextDecoder().decode(idBytes) as ClientId;
 
+      if (!VALID_CLIENT_IDS.includes(peerId)) {
+        throw createProtocolError("MSG2", `Invalid peer ID: ${peerId}`);
+      }
+
       if (peerId !== expectedPeerId) {
         throw createProtocolError(
-          'MSG2',
-          `ATTACK DETECTED: Identity mismatch - expected ${expectedPeerId}, got ${peerId}`
+          "MSG2",
+          `ATTACK DETECTED: Identity mismatch - expected ${expectedPeerId}, got ${peerId}`,
         );
       }
 
@@ -164,46 +170,46 @@ export async function verifyMSG2(
     }
   } catch (error) {
     const err = error as Error;
-    if (err.name === 'CryptoError' || err.name === 'ProtocolError') {
+    if (err.name === "CryptoError" || err.name === "ProtocolError") {
       throw error;
     }
-    throw createProtocolError('MSG2', 'Failed to verify MSG2');
+    throw createProtocolError("MSG2", "Failed to verify MSG2");
   }
 }
 
 export async function createMSG3(
   peerNonce: Uint8Array,
-  peerPublicKey: CryptoKey
+  peerPublicKey: CryptoKey,
 ): Promise<string> {
   try {
     return await encryptRSA(peerNonce, peerPublicKey);
   } catch (error) {
-    if ((error as Error).name === 'CryptoError') throw error;
-    throw createProtocolError('MSG3', 'Failed to create MSG3');
+    if ((error as Error).name === "CryptoError") throw error;
+    throw createProtocolError("MSG3", "Failed to create MSG3");
   }
 }
 
 export async function verifyMSG3(
   ciphertext: string,
   myNonce: Uint8Array,
-  myPrivateKey: CryptoKey
+  myPrivateKey: CryptoKey,
 ): Promise<void> {
   try {
     const decrypted = await decryptRSA(ciphertext, myPrivateKey);
 
     if (decrypted.length !== NONCE_LENGTH) {
-      throw createProtocolError('MSG3', 'Invalid MSG3 payload length');
+      throw createProtocolError("MSG3", "Invalid MSG3 payload length");
     }
 
     if (!constantTimeCompare(decrypted, myNonce)) {
-      throw createProtocolError('MSG3', 'Nonce mismatch');
+      throw createProtocolError("MSG3", "Nonce mismatch");
     }
   } catch (error) {
     const err = error as Error;
-    if (err.name === 'CryptoError' || err.name === 'ProtocolError') {
+    if (err.name === "CryptoError" || err.name === "ProtocolError") {
       throw error;
     }
-    throw createProtocolError('MSG3', 'Failed to verify MSG3');
+    throw createProtocolError("MSG3", "Failed to verify MSG3");
   }
 }
 

@@ -1,6 +1,10 @@
+import type { PublicKeyJwk } from "../types";
+
 export interface MitmManager {
   active: boolean;
-  intruderPublicKey: string | null;
+  protocol: "NSPK" | "NSL" | null;
+  attackInProgress: boolean;
+  intruderPublicKey: PublicKeyJwk | null;
   interceptedPackets: Array<{
     timestamp: number;
     from: string;
@@ -13,21 +17,42 @@ export interface MitmManager {
 export function createMitmManager(): MitmManager {
   return {
     active: false,
+    protocol: null,
+    attackInProgress: false,
     intruderPublicKey: null,
     interceptedPackets: [],
   };
 }
 
-export function activateMitm(manager: MitmManager, intruderPublicKey: string): void {
+export function setMitmProtocol(
+  manager: MitmManager,
+  protocol: "NSPK" | "NSL" | null,
+): void {
+  manager.protocol = protocol;
+}
+
+export function activateMitm(
+  manager: MitmManager,
+  intruderPublicKey: PublicKeyJwk,
+): void {
   manager.active = true;
+  manager.attackInProgress = false;
   manager.intruderPublicKey = intruderPublicKey;
-  console.log('[MitM] Attack mode activated');
+  console.log(`[MitM] Attack mode activated for protocol=${manager.protocol}`);
+}
+
+export function setAttackInProgress(
+  manager: MitmManager,
+  active: boolean,
+): void {
+  manager.attackInProgress = active;
 }
 
 export function deactivateMitm(manager: MitmManager): void {
   manager.active = false;
+  manager.attackInProgress = false;
   manager.intruderPublicKey = null;
-  console.log('[MitM] Attack mode deactivated');
+  console.log("[MitM] Attack mode deactivated");
 }
 
 export function isMitmActive(manager: MitmManager): boolean {
@@ -39,7 +64,7 @@ export function logPacket(
   from: string,
   to: string,
   type: string,
-  payload: any
+  payload: unknown,
 ): void {
   const payloadStr = JSON.stringify(payload).substring(0, 32);
   manager.interceptedPackets.push({

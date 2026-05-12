@@ -1,11 +1,11 @@
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
-import { config } from './config';
-import { createClientManager } from './services/ClientManager';
-import { createMitmManager } from './services/MitmManager';
-import { setupSocketHandlers } from './handlers/socketHandlers';
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import cors from "cors";
+import { config } from "./config";
+import { createClientManager } from "./services/ClientManager";
+import { createMitmManager } from "./services/MitmManager";
+import { setupSocketHandlers } from "./handlers/socketHandlers";
 
 const app = express();
 const httpServer = createServer(app);
@@ -20,19 +20,35 @@ const clientManager = createClientManager();
 const mitmManager = createMitmManager();
 
 // Protocol state management
-let currentProtocol: 'NSPK' | 'NSL' | null = null;
+let currentProtocol: "NSPK" | "NSL" | null = null;
 
-io.on('connection', (socket) => {
-  setupSocketHandlers(socket, io, clientManager, mitmManager, currentProtocol, (protocol) => {
-    currentProtocol = protocol;
+io.on("connection", (socket) => {
+  setupSocketHandlers(
+    socket,
+    io,
+    clientManager,
+    mitmManager,
+    currentProtocol,
+    (protocol) => {
+      currentProtocol = protocol;
+    },
+  );
+
+  // Always send bootstrap snapshot to stabilize initial client state.
+  socket.emit("message", {
+    type: "BOOTSTRAP_SNAPSHOT",
+    from: "server",
+    to: "client",
+    payload: { protocol: currentProtocol },
+    timestamp: Date.now(),
   });
 
-  // Send current protocol to newly connected client
+  // Keep compatibility with current protocol sync behavior.
   if (currentProtocol) {
-    socket.emit('message', {
-      type: 'PROTOCOL_SET',
-      from: 'server',
-      to: 'client',
+    socket.emit("message", {
+      type: "PROTOCOL_SET",
+      from: "server",
+      to: "client",
       payload: { protocol: currentProtocol },
       timestamp: Date.now(),
     });

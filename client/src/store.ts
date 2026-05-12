@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 import type {
   ClientId,
   FSMState,
@@ -8,14 +8,15 @@ import type {
   ProtocolLog,
   InterceptedPacket,
   Protocol,
-} from './types';
-import { MAX_CHAT_MESSAGES, MAX_PROTOCOL_LOGS } from './utils';
+} from "./types";
+import { MAX_CHAT_MESSAGES, MAX_PROTOCOL_LOGS } from "./utils";
 
 interface AppState {
   // Identity and state
   myId: ClientId | null;
   fsmState: FSMState;
   protocol: Protocol | null;
+  wsConnected: boolean;
 
   // Cryptographic keys
   keyPair: KeyPair | null;
@@ -38,9 +39,10 @@ interface AppState {
   attackDetected: boolean;
 
   // Actions
-  setMyId: (id: ClientId) => void;
+  setMyId: (id: ClientId | null) => void;
   setFsmState: (state: FSMState) => void;
   setProtocol: (protocol: Protocol | null) => void;
+  setWsConnected: (connected: boolean) => void;
   setKeyPair: (keyPair: KeyPair) => void;
   setPeers: (peers: Peer[]) => void;
   setMyNonce: (nonce: Uint8Array | null) => void;
@@ -61,8 +63,9 @@ interface AppState {
 
 const initialState = {
   myId: null,
-  fsmState: 'IDLE' as FSMState,
+  fsmState: "IDLE" as FSMState,
   protocol: null,
+  wsConnected: false,
   keyPair: null,
   peers: [],
   myNonce: null,
@@ -83,6 +86,7 @@ export const useStore = create<AppState>((set) => ({
   setMyId: (myId) => set({ myId }),
   setFsmState: (fsmState) => set({ fsmState }),
   setProtocol: (protocol) => set({ protocol }),
+  setWsConnected: (wsConnected) => set({ wsConnected }),
   setKeyPair: (keyPair) => set({ keyPair }),
   setPeers: (peers) => set({ peers }),
   setMyNonce: (myNonce) => set({ myNonce }),
